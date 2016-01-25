@@ -1,0 +1,16 @@
+{
+  "manifest_version": 2,
+
+  "name": "Playlistify",
+  "description": "Transforming plaintext track list to a Spotify playlist",
+  "version": "0.0.1",
+
+  "browser_action": {
+    "default_icon": "icon.png",
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "identity",
+    "https://*.spotify.com/"
+  ]
+}
