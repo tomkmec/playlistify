@@ -51,33 +51,41 @@ $(function() {
       if (t != '') {
         $('#step3 tbody')
           .append($('<tr>').addClass('pending').data('raw', t)
-            .append($('<td colspan="4">')
-              .addClass('mdl-data-table__cell--non-numeric')
-              .attr('colspan', 4)
-              .html('Searching for '+ t + '...')));
+            .append(
+              $('<td>').append($('<div>').addClass("mdl-spinner mdl-spinner--single-color mdl-js-spinner is-active")),
+              $('<td>')
+                .addClass('mdl-data-table__cell--non-numeric')
+                .attr('colspan', 4)
+                .html('Searching for '+ t + '...'),
+              $('<td>').addClass('mdl-data-table__cell--non-numeric')));
       }
     });
 
     if ($('tbody tr').length > 0) {
       $('#step2').fadeOut();
       $('#step3').fadeIn();
-      $('tbody tr').each(function() {
-        var $track = $(this);
-        $.ajax({
-          url: 'https://api.spotify.com/v1/search',
-          type: 'GET',
-          data: {
-            'type': 'track', 
-            'q': $track.data('raw'),
-            'limit': 10,
-            'market': 'from_token'
-          },
-          headers: {
-              'Authorization': 'Bearer ' + context.accessToken
-          },
-          dataType: 'json',
-          success: context.onSearchResult($track)
-        });
+      componentHandler.upgradeDom();
+      $('tbody tr').each(context.doTrackSearch(context.onSearchResult));
+    }
+  }
+
+  this.doTrackSearch = function doTrackSearch(callback, $trackIn) {
+    return function() {
+      var $track = $trackIn || $(this);
+      $.ajax({
+        url: 'https://api.spotify.com/v1/search',
+        type: 'GET',
+        data: {
+          'type': 'track', 
+          'q': $track.data('raw'),
+          'limit': 10,
+          'market': 'from_token'
+        },
+        headers: {
+            'Authorization': 'Bearer ' + context.accessToken
+        },
+        dataType: 'json',
+        success: callback($track)
       })
     }
   }
@@ -89,7 +97,7 @@ $(function() {
         var rowId = 'track' + $track.index();
         var tdClass = "mdl-data-table__cell--non-numeric";
 
-        var $optionsTD = $('<td>');
+        var $optionsTD = $('<td>').addClass(tdClass);
         if (data.tracks.items.length > 1) {
           var $optionsLI = [];
           $.each(data.tracks.items, function() {
@@ -97,7 +105,7 @@ $(function() {
             var desc = this.artists[0].name + ': ' + this.name + ' (' + this.album.name + ')';
             $optionsLI.push($('<li>').addClass("mdl-menu__item").html(desc).data('spotify-uri', altData.uri).on('click', function() {
               $track.find('td')
-                .first().html(altData.artists[0].name)
+                .first().next().next().html(altData.artists[0].name)
                 .next().html(altData.name)
                 .next().html(altData.album.name)
               // $(this).siblings().removeAttr('disabled');
@@ -116,6 +124,8 @@ $(function() {
         }
 
         $track.empty()
+          .append($('<td>').addClass(tdClass).empty().append($('<i>').addClass("material-icons").html('done')))
+          .append($('<td>').addClass(tdClass).html($track.data('raw')))
           .append($('<td>').addClass(tdClass).html(track.artists[0].name))
           .append($('<td>').addClass(tdClass).html(track.name))
           .append($('<td>').addClass(tdClass).html(track.album.name))
@@ -123,14 +133,27 @@ $(function() {
           .data('spotify-uri', track.uri)
         $track.removeClass('pending').addClass('found');
       } else {
-        $track.addClass('na').removeClass('pending').find("td").html('could not find "' + $track.data('raw') + '"');
+        $track.addClass('na').removeClass('pending').find("td")
+          .first().empty().append($('<i>').addClass("material-icons").html('error_outline'))
+          .next().empty().append(
+            $('<div>').addClass("mdl-textfield mdl-js-textfield").css({padding:0, width: '100%','padding-right': '48px', 'margin-right': '-30px'}).append(
+              $('<input>').addClass("mdl-textfield__input").val($track.data('raw'))))
+          .next().empty().append(
+            $('<button>').addClass("mdl-button mdl-js-button mdl-button--icon").css('top', '-6px').attr('id', rowId)
+              .append($('<i>').addClass("material-icons").html("youtube_searched_for"))
+              .on('click', function() {
+                $track.data('raw', $track.find('input').val());
+                var searchFn = context.doTrackSearch(context.onSearchResult, $track);
+                searchFn();
+              })
+            )
       }
       if ($('p.pending').length == 0) context.onAllSearchDone();
     }
   }
 
   this.onAllSearchDone = function onAllSearchDone() {
-          componentHandler.upgradeDom();
+      componentHandler.upgradeDom();
       $('#done').removeAttr('disabled').on('click', context.createPlaylist);
   }
 
